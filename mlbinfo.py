@@ -18,9 +18,10 @@ client = genai.Client(
     api_key=my_api_key,
 )
 
-print("Welcome to our MLB app! We have the following two functionalities:")
-print("Information Mode: We will provide valuable information on whichever team you want")
-print("Good Game Predictor: You provide us a team and we will tell you which of the next 5 games will be exciting!")
+print("Welcome to MLB Hunch! We have the following two functionalities:")
+print("🔍 Information Mode: We will provide valuable information on whichever MLB team you want")
+print("⭐ Winning Games Predictor: You provide us a team and we will predict who will win in their next 5 games.")
+print("We will also tell you which one of the 5 games will be most exciting to watch!\n" )
 mode = input("Please input 1 for Information Mode or 2 for Good Game Predictor: ")
 
 def next_x_games(id,x):
@@ -40,7 +41,7 @@ def next_x_games(id,x):
         venue = g['venue_name']
         line = f"{game_day} vs {opponent}  @ {venue}"
         print(line)
-    print("\n")
+ 
     for g in upcoming:
         s.append({
             "game_id"   : g['game_id'],
@@ -86,6 +87,7 @@ def info_mode():
             next_x_games(teams[0]['id'],10)
 
             players = statsapi.roster(teams[0]['id'])
+            print("\n")
             print("The teams roster is the follwing: ")
             print(players)
             break 
@@ -136,19 +138,21 @@ def predictor_mode():
             #    print("In the game ", i['game_partipants'], "the", i['winner'], "won")
             #    if i['exciting']:
             #        print("This game was deemed the most exciting")
+            
+            print("Winning predictions for the next 5 games:\n") 
 
             for p in winning_prediction:
 
                 away, home = map(str.strip, p["game_participants"].split("vs"))
                 winner = p["winner"]
-                loser  = home if winner == away else away   
+                loser  = home if winner == away else away  
 
                 print(f"In the game {p['game_participants']}, the {winner} are predicted to beat the {loser}.")
                 if p.get("exciting"):
-                    print("This matchup above is expected to be the most exciting.\n")
+                    print("This matchup above is expected to be the most exciting! ⚾ \n")
             
            
-            choice = input("Do you want to store this solution? (yes/no) : ")
+            choice = input("Do you want to store this prediction? (yes/no) : ")
             if choice == 'yes':
                 make_db(winning_prediction)
             break
@@ -172,7 +176,7 @@ def viewPreds():
         query_result = connection.execute(db.text("SELECT * FROM preds_df;")).fetchall()
         print(pd.DataFrame(query_result))
     
-    deleted = input("Would you like to delete all saved info (yes/no): ")
+    deleted = input("Would you like to delete all saved predictions (yes/no): ")
     if deleted == 'yes':
         with engine.begin() as connection:
             connection.execute(db.text("DELETE FROM preds_df;"))
