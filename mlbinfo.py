@@ -3,6 +3,7 @@ import statsapi
 import os 
 from google import genai
 from google.genai import types
+import json
 
 my_api_key = os.getenv('MLB_PRED')
 genai.api_key = my_api_key
@@ -33,7 +34,15 @@ def next_x_games(id,x):
         venue = g['venue_name']
         line = f"{game_day} vs {opponent}  @ {venue}"
         print(line)
-        s.append(line)
+    print("\n")
+    for g in upcoming:
+        s.append({
+            "game_id"   : g['game_id'],
+            "game_date" : g['game_date'],
+            "home_team" : g['home_name'],
+            "away_team" : g['away_name'],
+            "venue"     : g['venue_name']
+        })
     return s
     
         
@@ -89,22 +98,49 @@ def predictor_mode():
             team = input("Please enter either team name or id: ")
         else:
             t = teams[0]['id']
-            vec = next_x_games(t,5)
+            s = next_x_games(t,5)
+            games_json = json.dumps({"s": s}, separators=(",", ":"))
             prompt = (
                 "Here are the games: \n \n" +
-                "\n".join(vec)
+                "You are an MLB analyst. You will receive a JSON array called 's'.  For *each* game produce an object with:\n"
+                "  • game_id            (copy)\n"
+                "  • game_participants  (home team name vs away team)\n"
+                "  • winner             (team name string)\n"
+                "  • exciting           true/false  – mark exactly ONE game true "
+                "(the matchup you expect to be the closest/highest-drama)\n"
+                "Return *ONLY* a JSON array of these objects—no prose, no markdown."
+                "\n"
             )
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 config=types.GenerateContentConfig(
-                system_instruction="You are a sports analyst for the MLB, you will be given 5 future games and you should give a prediction for who will win each one, You will also identify which will be the most exciting game to watch, meaning the closest of the following"
+                system_instruction= prompt
                 ),
-                contents= prompt
+                contents = [{
+                    "role": "user",
+                    "parts": [
+                    { "text": json.dumps({"s": s}, indent=None) }
+                    ]
+                }
+            ]
             )
-            print(response.text)
-            break
+            #print(response.text)
+            winning_prediction = json.loads(response.text)
+            #for i in winning_prediction:
+            #    print("In the game ", i['game_partipants'], "the", i['winner'], "won")
+            #    if i['exciting']:
+            #        print("This game was deemed the most exciting")
 
-    
+            for p in winning_prediction:
+
+                away, home = map(str.strip, p["game_participants"].split("vs"))
+                winner = p["winner"]
+                loser  = home if winner == away else away   
+
+                print(f"In the game {p['game_participants']}, the {winner} are predicted to beat the {loser}.")
+                if p.get("exciting"):
+                    print("🔥 This matchup above is expected to be the most exciting.\n")
+            break
 
 
 while True:
