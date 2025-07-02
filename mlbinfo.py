@@ -4,9 +4,14 @@ import os
 from google import genai
 from google.genai import types
 import json
+import sqlite3
+import pandas as pd
+import sqlalchemy as db
 
 my_api_key = os.getenv('MLB_PRED')
 genai.api_key = my_api_key
+
+DB_FILE = "preds_df.db" 
 
 # Create an genAI client using the key from our environment variable
 client = genai.Client(
@@ -27,7 +32,8 @@ def next_x_games(id,x):
     if not upcoming:
         print("No games in the next 30 days")
         return
-    print(f"\nNext {len(upcoming)} games:\n")
+    team = statsapi.lookup_team(id)
+    print(f"\nNext {len(upcoming)} games for the {team[0]['name']}\n")
     for g in upcoming:
         game_day = g['game_date']
         opponent = g['away_name'] if g['home_id'] == id else g['home_name']
@@ -139,8 +145,43 @@ def predictor_mode():
 
                 print(f"In the game {p['game_participants']}, the {winner} are predicted to beat the {loser}.")
                 if p.get("exciting"):
-                    print("🔥 This matchup above is expected to be the most exciting.\n")
+                    print("This matchup above is expected to be the most exciting.\n")
+            
+           
+            choice = input("Do you want to store this solution? (yes/no) : ")
+            if choice == 'yes':
+                make_db(winning_prediction)
             break
+
+def make_db(preds):
+    
+    preds_df = pd.DataFrame(preds)
+    engine = db.create_engine('sqlite:///preds_df.db')
+    preds_df.to_sql('preds_df', con=engine, if_exists='append', index=False)
+    with engine.connect() as connection:
+        query_result = connection.execute(db.text("SELECT * FROM preds_df;")).fetchall()
+    print("Predictions saved!")
+
+def viewPreds():
+
+    if not os.path.exists(DB_FILE):
+        print("There is no Database saved")
+        return
+    engine = db.create_engine('sqlite:///preds_df.db')
+    with engine.connect() as connection:
+        query_result = connection.execute(db.text("SELECT * FROM preds_df;")).fetchall()
+        print(pd.DataFrame(query_result))
+    
+    deleted = input("Would you like to delete all saved info (yes/no): ")
+    if deleted == 'yes':
+        with engine.begin() as connection:
+            connection.execute(db.text("DELETE FROM preds_df;"))
+
+
+    
+
+
+
 
 
 while True:
@@ -150,6 +191,9 @@ while True:
 
     if mode == '2':
         predictor_mode()
+        check = input("Would you like to see past predictions (yes/no): ")
+        if check == 'yes':
+            viewPreds()
         break
     
     if mode == '9':
